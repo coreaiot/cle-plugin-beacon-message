@@ -11,7 +11,9 @@ export interface IPlugin<
   enabled: boolean;
   debug: boolean;
   status: {
-    [k in Status['fields'][number]['name'] | 'result']: string;
+    [k in Status['fields'][number]['name'] | 'result']:
+    Extract<Status['fields'][number], { name: k }>['value'] extends never ?
+    string : Extract<Status['fields'][number], { name: k }>['value'];
   };
   logger: {
     info(...args: any[]): void;

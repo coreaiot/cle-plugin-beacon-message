@@ -5,6 +5,7 @@ export const status = generateStatus({
     {
       name: 'status',
       description: 'Status',
+      value: 'idle' as string,
     },
   ],
   getResult(obj) {
