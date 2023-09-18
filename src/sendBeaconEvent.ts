@@ -1,5 +1,6 @@
 import { checkSum1B } from './checkSum1B';
 import { IBeacons, IBinaryCommand, Plugin, Utils, addColonToMac } from './lib';
+import { getBeacons } from './lib/getBeacons';
 
 const cmd: IBinaryCommand = {
   cmd: 0x13,
@@ -30,24 +31,7 @@ export async function sendBeaconEvent(
   if (!body.mac) throw 'Beacon mac required';
   const mac: string = body.mac.toLowerCase().replace(/:/g, '');
 
-  const beacons = (() => {
-    const now = new Date().getTime();
-    const ts = now - utils.projectEnv.beaconLifeTime;
-    const buf = utils.ca.getBeaconsBuffer(ts);
-
-    const data: IBeacons = {};
-    if (buf.length > 5) {
-      const bsize = buf.readUint16LE(3);
-      const n = (buf.length - 5) / bsize;
-      for (let i = 0; i < n; ++i) {
-        const b = utils.parseBeaconResult(utils.projectChannels, buf, i * bsize + 5);
-        data[b.mac] = b;
-        delete b.mac;
-      }
-    }
-
-    return data;
-  })();
+  const beacons = getBeacons(utils);
   if (!beacons[mac]) throw `Beacon ${mac} not valid`;
 
   const gMac = beacons[mac].lastGateway;

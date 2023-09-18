@@ -90,6 +90,7 @@ type IMessageEvents = {
     counter: (buffer: Buffer) => void;
     'beacons-counter': (buffer: Buffer) => void;
     'locators-counter': (buffer: Buffer) => void;
+    'beacon-response': (mac: string, buffer: Buffer) => void;
     heartbeat: (buffer: Buffer) => void;
     udp: (ip: string, port: number, data: Buffer) => void;
 };

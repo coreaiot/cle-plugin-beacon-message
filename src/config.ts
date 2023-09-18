@@ -9,5 +9,11 @@ export const config = generateConfig({
       description: 'Do NOT use API prefix',
       value: true,
     },
+    {
+      name: 'useDeprecatedApis',
+      type: 'switch',
+      description: 'Use deprecated APIs',
+      value: true,
+    },
   ],
 });
