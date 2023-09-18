@@ -4,10 +4,20 @@ export const config = generateConfig({
   description: 'Beacon Message Plugin configurations.',
   fields: [
     {
-      name: 'doNotUseApiPrefix',
-      type: 'switch',
-      description: 'Do NOT use API prefix',
-      value: true,
+      name: 'apiPrefix',
+      type: 'dropdown',
+      items: [
+        {
+          label: '/beacons',
+          value: '/beacons',
+        },
+        {
+          label: '/plugins/cle-plugin-beacon-message',
+          value: '/plugins/cle-plugin-beacon-message',
+        },
+      ],
+      description: 'API Prefix',
+      value: '/beacons',
     },
     {
       name: 'useDeprecatedApis',

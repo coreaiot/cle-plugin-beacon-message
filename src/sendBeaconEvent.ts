@@ -25,7 +25,7 @@ export async function sendBeaconEvent(
   utils: Utils,
   body: IBeaconEventBody
 ) {
-  self.status.status = 'buzy';
+  self.status.status = 'sending beacon event';
   utils.updateStatus(self);
 
   if (!body.mac) throw 'Beacon mac required';

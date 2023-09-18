@@ -10,7 +10,7 @@ import { IMessageBatchBody, sendMessageBatch } from './sendMessageBatch';
 export async function init(self: Plugin, utils: Utils) {
   const config = await utils.loadConfig(self);
   const packUri = (p: string) => {
-    return config.doNotUseApiPrefix ? '/beacons' + p : '/plugins/' + self.name + p;
+    return config.apiPrefix + p;
   };
   self.status.status = 'idle';
   setInterval(() => {
@@ -20,15 +20,19 @@ export async function init(self: Plugin, utils: Utils) {
   const errMsgBuzy = 'Busy now. Try later!';
 
   utils.http.apis.push(router => {
-    router.post(packUri('/message/batch'), async ctx => {
-      if (self.status.status === 'buzy') {
+    const sendMessageBatchUri = packUri('/message/batch');
+    router.post(sendMessageBatchUri, async ctx => {
+      const requestBody = parseHttpRequestBody<IMessageBatchBody>(ctx);
+
+      if (self.debug)
+        self.logger.debug(`POST ${sendMessageBatchUri}`, JSON.stringify(requestBody, null, 2));
+      if (self.status.status !== 'idle') {
         ctx.status = 400;
         ctx.body = errMsgBuzy;
         return;
       }
 
       try {
-        const requestBody = parseHttpRequestBody<IMessageBatchBody>(ctx);
         const res = await sendMessageBatch(self, utils, requestBody);
         ctx.status = 200;
         ctx.body = res;
@@ -36,18 +40,18 @@ export async function init(self: Plugin, utils: Utils) {
         self.status.status = 'idle';
         self.logger.error(e);
         ctx.status = 400;
-        ctx.body = {e};
+        ctx.body = { e };
       }
     });
 
-    if(config.useDeprecatedApis) {
+    if (config.useDeprecatedApis) {
       router.post(packUri('/:mac/event'), async ctx => {
-        if (self.status.status === 'buzy') {
+        if (self.status.status !== 'idle') {
           ctx.status = 400;
           ctx.body = errMsgBuzy;
           return;
         }
-  
+
         try {
           const requestBody = parseHttpRequestBody<IBeaconEventBody>(ctx);
           requestBody.mac = ctx.params.mac;

@@ -8,7 +8,7 @@ export const status = generateStatus({
     },
   ],
   getResult(obj) {
-    if (obj.status === 'buzy')
+    if (obj.status !== 'idle')
       return 'buzy';
     return 'idle'
   },
@@ -16,7 +16,7 @@ export const status = generateStatus({
     switch (key) {
       case 'result':
       case 'status':
-        if (obj.status === 'buzy') return 'secondary';
+        if (obj.status !== 'idle') return 'secondary';
         return 'success';
       default:
         return '';
