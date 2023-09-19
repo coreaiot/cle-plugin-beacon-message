@@ -12,3 +12,4 @@ export * from './Utils';
 export * from './IUdp';
 export * from './parseHttpRequestBody';
 export * from './addColonToMac';
+export * from './getBeacons';

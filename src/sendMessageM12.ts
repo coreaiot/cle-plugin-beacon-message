@@ -1,5 +1,5 @@
 import { checkSum1B } from "./checkSum1B";
-import { IBeacons, IBinaryCommand, IGatewayResultIndexedByMac, IGatewaysIndexedByMac, Utils, addColonToMac } from "./lib";
+import { IBeacons, IBinaryCommand, IGatewaysIndexedByMac, Utils, addColonToMac } from "./lib";
 
 const cmdSendMessage: IBinaryCommand = {
   cmd: 0xa3,
@@ -78,10 +78,14 @@ export async function sendMessageM12(
 export function groupLocators(beacons: IBeacons, locators: IGatewaysIndexedByMac, macs: string[]) {
   const ls: IGroupedLocator[] = [];
   for (const mac of macs) {
-    const gMac = beacons[mac].nearestGateway;
-    const best = locators[addColonToMac(gMac)];
-    if (!best) {
-      throw mac + ' not found';
+    let gMac = beacons[mac].nearestGateway;
+    let best = locators[addColonToMac(gMac)];
+    if (!best || !best.ip) {
+      gMac = beacons[mac].lastGateway;
+      best = locators[addColonToMac(gMac)];
+    }
+    if (!best || !best.ip) {
+      continue;
     }
     let ex = ls.find(l => l.mac === gMac);
     if (!ex) {

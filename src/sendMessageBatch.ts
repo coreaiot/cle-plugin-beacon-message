@@ -1,6 +1,6 @@
 import { checkSum1B } from "./checkSum1B";
-import { IBeacons, IBinaryCommand, IGatewayResultIndexedByMac, Plugin, Utils, addColonToMac } from "./lib";
-import { getBeacons } from "./lib/getBeacons";
+import { IBinaryCommand, Plugin, Utils, addColonToMac, getBeacons } from "./lib";
+import { sendMessageM0 } from "./sendMessageM0";
 import { IGroupedLocator, sendMessageM12 } from "./sendMessageM12";
 
 export interface IMessageBatchBody {
@@ -151,7 +151,7 @@ function addLog(self: Plugin, utils: Utils, logs: string[], mac: string, tag: st
   logs.push(str);
   if (self.debug) {
     const log = self.logger[tag.toLowerCase()];
-    log && log(`[${mac}] ${message}`);
+    log && log(`[sendMessageBatch ${mac}] ${message}`);
   }
 }
 
@@ -233,16 +233,6 @@ async function sendMessageM12BatchItem(
   addLog(self, utils, logs, mac, 'DEBUG', 'done');
 }
 
-const cmdMsgLong: IBinaryCommand = {
-  cmd: 0x17,
-  result: b => {
-    if (!b.length) return false;
-    if (b[b.length - 1] !== checkSum1B(b.slice(0, b.length - 1))) return false;
-    if (b[b.length - 2] !== 0x01) return false;
-    return b;
-  },
-};
-
 async function sendMessageM0BatchItem(
   logs: string[],
   self: Plugin,
@@ -256,39 +246,8 @@ async function sendMessageM0BatchItem(
   locatorResponseTimeoutMs: number,
 ) {
   addLog(self, utils, logs, mac, 'DEBUG', 'start by locator ' + locatorMac);
-  const v = typeof value === 'string' ? Array.from(Buffer.from(value)) : value;
-
-  if (v.length > 63) throw 'The max length of value is 63';
-
-  const ab = new ArrayBuffer(7 + v.length);
-  const u8a = new Uint8Array(ab);
-  u8a[0] = sendDurationM0;
-  u8a[1] = parseInt(mac.slice(0, 2), 16) || 0;
-  u8a[2] = parseInt(mac.slice(2, 4), 16) || 0;
-  u8a[3] = parseInt(mac.slice(4, 6), 16) || 0;
-  u8a[4] = parseInt(mac.slice(6, 8), 16) || 0;
-  u8a[5] = parseInt(mac.slice(8, 10), 16) || 0;
-  u8a[6] = parseInt(mac.slice(10, 12), 16) || 0;
-
-  for (let i = 0; i < v.length; i++) u8a[7 + i] = v[i];
-
   addLog(self, utils, logs, mac, 'DEBUG', 'sending m0 message');
-
-  const { take, timeout, catchError } = utils.modules.rxjsOperators;
-  const { throwError, TimeoutError } = utils.modules.rxjs;
-  await utils.udp
-    .sendBinaryCmd(cmdMsgLong, locatorMac, [locatorAddr], ab)
-    .pipe(
-      timeout(locatorResponseTimeoutMs),
-      catchError(err => {
-        if (err instanceof TimeoutError) {
-          throw 'locator response timeout.';
-        }
-        return throwError(err);
-      }),
-      take(1),
-    )
-    .toPromise();
+  await sendMessageM0(utils, mac, locatorMac, [locatorAddr], value, sendDurationM0, locatorResponseTimeoutMs);
 
   addLog(self, utils, logs, mac, 'DEBUG', 'waiting for response');
   await new Promise<void>(async (r, rr) => {
