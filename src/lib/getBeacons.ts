@@ -1,6 +1,12 @@
-import { IBeacons, Utils } from ".";
+import { IBeacons } from "./IBeacons";
+import { IUtils } from "./IUtils";
 
-export function getBeacons(utils: Utils) {
+export function getBeacons<
+  Plugin,
+  Config extends {
+    fields: ReadonlyArray<any>;
+  },
+>(utils: IUtils<Plugin, Config>) {
   const now = new Date().getTime();
   const ts = now - utils.projectEnv.beaconLifeTime;
   const buf = utils.ca.getBeaconsBuffer(ts);
