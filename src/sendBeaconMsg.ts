@@ -15,7 +15,7 @@ export async function sendBeaconMsg(
   obj: IMsgBody,
   long: boolean,
 ) {
-  self.status.status = 'sending message';
+  self.status.status = long ?  'sending beacon msgLong' : 'sending beacon msg';
   utils.updateStatus(self);
 
   let mac: string;

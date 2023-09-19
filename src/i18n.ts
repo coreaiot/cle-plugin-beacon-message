@@ -6,6 +6,7 @@ export const i18n = generateI18n({
     'API Prefix': 'API 前缀',
     'Use deprecated APIs': '使用弃用的 API',
     'idle': '空闲',
+    'buzy': '繁忙',
     'Status': '状态',
     'sending beacon event': '发送信标事件',
     'batch sending message': '批量发送消息',
