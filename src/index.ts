@@ -3,7 +3,7 @@ export * from './status';
 export * from './i18n';
 
 import { Context } from 'koa';
-import { Plugin, Utils, parseHttpRequestBody } from './lib';
+import { Plugin, Utils, generateDocs, parseHttpRequestBody } from './lib';
 import { IBeaconEventBody, sendBeaconEvent } from './sendBeaconEvent';
 import { IMessageBody, sendMessage } from './sendMessage';
 import { IMessageBatchBody, sendMessageBatch } from './sendMessageBatch';
@@ -148,3 +148,5 @@ export async function test(self: Plugin, utils: Utils) {
   console.log(config);
   self.logger.info('Test OK.');
 }
+
+export const docs = generateDocs();
