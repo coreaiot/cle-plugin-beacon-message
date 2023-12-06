@@ -23,6 +23,7 @@ export interface IMessageBatchBody {
   timeoutM0?: number; // M0 信标超时时间（秒）（留空时使用全局超时时间）
   timeoutM12?: number; // M1，M2 信标超时时间（秒）（留空时使用全局超时时间）
   sendDurationM0?: number; // M0 信标发送时间（秒）（留空时为 5 秒）
+  beaconResponseDurationM12?: number; // M1, M2 信标回复时间（秒）（留空时为 3 秒）
   bufferSizeM12?: number; // M1，M2 分包长度（字节）（不大于 200）（留空时为 200）
   locatorResponseTimeout?: number; // 基站回复超时时间（秒）（留空时为 2 秒）
   messages: {
@@ -73,6 +74,7 @@ export interface IMessageBatchBody {
   timeoutM0?: number; // Timeout for M0 beacons (second) - If not set, it uses the global timeout.
   timeoutM12?: number; // Timeout for M1，M2 beacons (second) - If not set, it uses the global timeout.
   sendDurationM0?: number; // Duration for locators sending M0 beacons (second) - 5s if not set
+  beaconResponseDurationM12?: number; // Duration for beacon response for M1, M2 beacons (second) - 3s if not set
   bufferSizeM12?: number; // Packeage buffer size for M1, M2 beacons (bytes) - It must not be greater than 200. If not set, it uses 200.
   locatorResponseTimeout?: number; // Timeout for CLE receiving message from locators (second) - 2s if not set
   messages: {

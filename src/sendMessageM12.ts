@@ -1,5 +1,5 @@
 import { checkSum1B } from "./checkSum1B";
-import { IBeacons, IBinaryCommand, IGatewaysIndexedByMac, Utils, addColonToMac } from "./lib";
+import { IBeacons, IBinaryCommand, IGateways, Utils } from "@lib";
 
 const cmdSendMessage: IBinaryCommand = {
   cmd: 0xa3,
@@ -22,7 +22,6 @@ const cmdStopSendMessage: IBinaryCommand = {
 
 export interface IGroupedLocator {
   mac: string;
-  ip: string;
   product: string;
   sMacs: string[];
 }
@@ -42,7 +41,7 @@ export async function sendMessageM12(
 
   if (type === 'start') {
     const length = 18 + value.length + 6 * l.sMacs.length;
-    const u8a = new Uint8Array(length);
+    const u8a = Buffer.alloc(length);
     u8a[0] = 2;
     u8a[1] = timeoutMs;
     u8a[2] = 0x80;
@@ -57,7 +56,7 @@ export async function sendMessageM12(
         u8a[idx + j] = parseInt(l.sMacs[i].slice(j * 2, j * 2 + 2), 16);
     }
     await utils.udp
-      .sendBinaryCmd(cmdSendMessage, l.mac, [l.ip], u8a.buffer)
+      .sendBinaryCmd(l.mac, cmdSendMessage, u8a)
       .pipe(
         timeout(locatorResponseTimeoutMs),
         catchError(err => {
@@ -71,18 +70,18 @@ export async function sendMessageM12(
       .toPromise();
   } else {
     utils.udp
-      .sendBinaryCmd(cmdStopSendMessage, l.mac, [l.ip]);
+      .sendBinaryCmd(l.mac, cmdStopSendMessage);
   }
 }
 
-export function groupLocators(beacons: IBeacons, locators: IGatewaysIndexedByMac, macs: string[]) {
+export function groupLocators(beacons: IBeacons, locators: IGateways, macs: string[]) {
   const ls: IGroupedLocator[] = [];
   for (const mac of macs) {
     let gMac = beacons[mac].nearestGateway;
-    let best = locators[addColonToMac(gMac)];
+    let best = locators[gMac];
     if (!best || !best.ip) {
       gMac = beacons[mac].lastGateway;
-      best = locators[addColonToMac(gMac)];
+      best = locators[gMac];
     }
     if (!best || !best.ip) {
       continue;
@@ -91,7 +90,6 @@ export function groupLocators(beacons: IBeacons, locators: IGatewaysIndexedByMac
     if (!ex) {
       ex = {
         mac: gMac,
-        ip: best.ip,
         product: best.info.realModelName,
         sMacs: [],
       };

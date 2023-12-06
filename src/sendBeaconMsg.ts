@@ -1,5 +1,4 @@
-import { checkSum1B } from "./checkSum1B";
-import { IBinaryCommand, Utils, Plugin, getBeacons, addColonToMac } from "./lib";
+import { Utils, Plugin, getBeacons, IGatewayResult } from "@lib";
 import { sendMessageM0 } from "./sendMessageM0";
 import { sendMessageM0Old } from "./sendMessageM0Old";
 
@@ -20,7 +19,6 @@ export async function sendBeaconMsg(
 
   let mac: string;
   let gMac: string;
-  let addresses: string[];
   let sendDurationM0 = 5;
   let timeoutM0 = 10;
 
@@ -33,26 +31,34 @@ export async function sendBeaconMsg(
     mac = obj.mac.replace(/:/g, '');
     const beacons = getBeacons(utils);
     const locators = (() => {
+      const locators: IGatewayResult[] = [];
       const now = new Date().getTime();
       const ts = now - utils.projectEnv.locatorLifeTime;
-      const data = utils.packGatewaysByMac(utils.activeLocators, ts);
-      return data;
+      const buf = utils.ca.getLocatorsBuffer(ts);
+      if (buf.length > 5) {
+        const bsize = buf.readUint16LE(3);
+        const n = (buf.length - 5) / bsize;
+        for (let i = 0; i < n; ++i) {
+          const l = utils.parseLocatorResult(buf, i * bsize + 5, ts);
+          locators.push(l);
+        }
+      }
+      return utils.packGatewaysByMac(locators, undefined, true);
     })();
     if (!beacons[mac]) throw 'beacon not found';
-    const [locatorMac, locator] = (() => {
+    const locatorMac = (() => {
       let locatorMac = beacons[mac].nearestGateway;
-      let locator = locators[addColonToMac(locatorMac)];
+      let locator = locators[locatorMac];
       if (!locator || !locator.ip) {
         locatorMac = beacons[mac].lastGateway;
-        locator = locators[addColonToMac(locatorMac)];
+        locator = locators[locatorMac];
       }
       if (!locator || !locator.ip) {
         throw 'locator `' + locatorMac + '` offline.';
       }
-      return [locatorMac, locator];
+      return locatorMac;
     })();
     gMac = locatorMac;
-    addresses = [locator.ip];
   }
 
   const v: number[] = obj.value || [];
@@ -60,7 +66,7 @@ export async function sendBeaconMsg(
   const maxLength = long ? 63 : 21;
   if (v.length > maxLength) throw `The max length of value is ${maxLength}`;
 
-  const done: string[] = await sendMessageItem(self, utils, mac, gMac, addresses, obj.value, sendDurationM0, timeoutM0, 2000, long);
+  const done: string[] = await sendMessageItem(self, utils, mac, gMac, obj.value, sendDurationM0, timeoutM0, 2000, long);
 
   self.status.status = 'idle';
   utils.updateStatus(self);
@@ -72,7 +78,6 @@ async function sendMessageItem(
   utils: Utils,
   mac: string,
   locatorMac: string,
-  locatorAddrs: string[],
   value: string | number[],
   sendDurationM0: number,
   timeoutM0: number,
@@ -91,7 +96,6 @@ async function sendMessageItem(
     utils,
     mac || '010203040506',
     locatorMac,
-    locatorAddrs,
     value,
     sendDurationM0,
     locatorResponseTimeoutMs,

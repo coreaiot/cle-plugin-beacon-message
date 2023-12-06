@@ -1,5 +1,4 @@
-import { checkSum1B } from "./checkSum1B";
-import { IBinaryCommand, Plugin, Utils, addColonToMac, getBeacons } from "./lib";
+import { IGatewayResult, Plugin, Utils, getBeacons } from "@lib";
 import { sendMessageM0 } from "./sendMessageM0";
 import { IGroupedLocator, sendMessageM12 } from "./sendMessageM12";
 
@@ -9,6 +8,7 @@ export interface IMessageBatchBody {
   timeoutM12?: number; // M1，M2 信标超时时间（秒）（留空时使用全局超时时间）
   sendDurationM0?: number; // M0 信标发送时间（秒）（留空时为 5 秒）
   bufferSizeM12?: number; // M1，M2 分包长度（字节）（不大于 200）（留空时为 200）
+  beaconResponseDurationM12?: number; // M1, M2 信标回复时间（秒）（留空时为 3 秒）
   locatorResponseTimeout?: number; // 基站回复超时时间（秒）（留空时为 2 秒）
   messages: Array<{
     mac: string; // 信标 MAC
@@ -27,6 +27,7 @@ export async function sendMessageBatch(
   let sendDurationM0 = 5;
   let timeoutM0 = 10;
   let timeoutM12 = 3;
+  let beaconResponseDurationM12 = 3;
   let bufferSize = 200;
   let locatorResponseTimeoutMs = 2000;
 
@@ -40,6 +41,9 @@ export async function sendMessageBatch(
 
   if (obj.timeoutM12 && typeof obj.timeoutM12 === 'number')
     timeoutM12 = obj.timeoutM12;
+
+  if (obj.beaconResponseDurationM12 && typeof obj.beaconResponseDurationM12 === 'number')
+    beaconResponseDurationM12 = obj.beaconResponseDurationM12;
 
   if (obj.sendDurationM0 && typeof obj.sendDurationM0 === 'number')
     sendDurationM0 = obj.sendDurationM0;
@@ -67,10 +71,19 @@ export async function sendMessageBatch(
 
   const beacons = getBeacons(utils);
   const locators = (() => {
+    const locators: IGatewayResult[] = [];
     const now = new Date().getTime();
     const ts = now - utils.projectEnv.locatorLifeTime;
-    const data = utils.packGatewaysByMac(utils.activeLocators, ts);
-    return data;
+    const buf = utils.ca.getLocatorsBuffer(ts);
+    if (buf.length > 5) {
+      const bsize = buf.readUint16LE(3);
+      const n = (buf.length - 5) / bsize;
+      for (let i = 0; i < n; ++i) {
+        const l = utils.parseLocatorResult(buf, i * bsize + 5, ts);
+        locators.push(l);
+      }
+    }
+    return utils.packGatewaysByMac(locators, undefined, true);
   })();
 
   for (const m of obj.messages) {
@@ -81,10 +94,10 @@ export async function sendMessageBatch(
       items.push({ mac, type: 'unknown', value: m.value, error: 'beacon not found' });
     } else {
       let locatorMac = beacons[mac].nearestGateway;
-      let locator = locators[addColonToMac(locatorMac)];
+      let locator = locators[locatorMac];
       if (!locator || !locator.ip) {
         locatorMac = beacons[mac].lastGateway;
-        locator = locators[addColonToMac(locatorMac)];
+        locator = locators[locatorMac];
       }
       if (!locator || !locator.ip) {
         items.push({ mac, type: 'unknown', value: m.value, error: `locator ${locatorMac} offline` });
@@ -106,7 +119,7 @@ export async function sendMessageBatch(
     switch (x.type) {
       case 'm0':
         try {
-          await sendMessageM0BatchItem(logs, self, utils, x.mac, x.locatorMac, x.locatorAddr, x.value, sendDurationM0, timeoutM0, locatorResponseTimeoutMs);
+          await sendMessageM0BatchItem(logs, self, utils, x.mac, x.locatorMac, x.value, sendDurationM0, timeoutM0, locatorResponseTimeoutMs);
         } catch (e) {
           addLog(self, utils, logs, x.mac, 'ERROR', e);
           x.error = e;
@@ -114,7 +127,7 @@ export async function sendMessageBatch(
         break;
       case 'm12':
         try {
-          await sendMessageM12BatchItem(logs, self, utils, x.mac, x.locatorMac, x.locatorAddr, x.value, bufferSize, timeoutM12, locatorResponseTimeoutMs);
+          await sendMessageM12BatchItem(logs, self, utils, x.mac, x.locatorMac, x.value, bufferSize, timeoutM12, beaconResponseDurationM12, locatorResponseTimeoutMs);
         } catch (e) {
           addLog(self, utils, logs, x.mac, 'ERROR', e);
           x.error = e;
@@ -161,16 +174,15 @@ async function sendMessageM12BatchItem(
   utils: Utils,
   mac: string,
   locatorMac: string,
-  locatorAddr: string,
   value: number[],
   bufferSizeM12: number,
   timeoutM12: number,
+  beaconResponseDurationM12: number,
   locatorResponseTimeoutMs: number,
 ) {
   addLog(self, utils, logs, mac, 'DEBUG', 'start by locator ' + locatorMac);
   const gl: IGroupedLocator = {
     mac: locatorMac,
-    ip: locatorAddr,
     product: '',
     sMacs: [mac],
   };
@@ -179,7 +191,7 @@ async function sendMessageM12BatchItem(
   for (let idx = 0; idx < numberOfPackets; ++idx) {
     const data = value.slice(idx * bufferSizeM12, (idx + 1) * bufferSizeM12);
 
-    const timeoutMS = timeoutM12 * 1000;
+    const timeoutMS = beaconResponseDurationM12 * 1000;
     const v = idx
       ? [
         beaconRequestId,
@@ -226,7 +238,7 @@ async function sendMessageM12BatchItem(
         if (ok) return;
         rr('beacon response timeout.');
         utils.ee.off('beacon-response', cb);
-      }, timeoutMS);
+      }, timeoutM12 * 1000);
     });
   }
 
@@ -239,7 +251,6 @@ async function sendMessageM0BatchItem(
   utils: Utils,
   mac: string,
   locatorMac: string,
-  locatorAddr: string,
   value: string | number[],
   sendDurationM0: number,
   timeoutM0: number,
@@ -247,7 +258,7 @@ async function sendMessageM0BatchItem(
 ) {
   addLog(self, utils, logs, mac, 'DEBUG', 'start by locator ' + locatorMac);
   addLog(self, utils, logs, mac, 'DEBUG', 'sending m0 message');
-  await sendMessageM0(utils, mac, locatorMac, [locatorAddr], value, sendDurationM0, locatorResponseTimeoutMs);
+  await sendMessageM0(utils, mac, locatorMac, value, sendDurationM0, locatorResponseTimeoutMs);
 
   addLog(self, utils, logs, mac, 'DEBUG', 'waiting for response');
   await new Promise<void>(async (r, rr) => {

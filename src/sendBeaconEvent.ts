@@ -1,6 +1,5 @@
 import { checkSum1B } from './checkSum1B';
-import { IBeacons, IBinaryCommand, Plugin, Utils, addColonToMac } from './lib';
-import { getBeacons } from './lib/getBeacons';
+import { getBeacons, IBinaryCommand, IGatewayResult, Plugin, Utils, addColonToMac } from '@lib';
 
 const cmd: IBinaryCommand = {
   cmd: 0x13,
@@ -36,10 +35,19 @@ export async function sendBeaconEvent(
 
   const gMac = beacons[mac].lastGateway;
   const gateways = (() => {
+    const locators: IGatewayResult[] = [];
     const now = new Date().getTime();
     const ts = now - utils.projectEnv.locatorLifeTime;
-    const data = utils.packGatewaysByMac(utils.activeLocators, ts);
-    return data;
+    const buf = utils.ca.getLocatorsBuffer(ts);
+    if (buf.length > 5) {
+      const bsize = buf.readUint16LE(3);
+      const n = (buf.length - 5) / bsize;
+      for (let i = 0; i < n; ++i) {
+        const l = utils.parseLocatorResult(buf, i * bsize + 5, ts);
+        locators.push(l);
+      }
+    }
+    return utils.packGatewaysByMac(locators, undefined, true);
   })();
   const gateway = gateways[addColonToMac(gMac)];
   if (!gateway) throw `Locator ${gMac} not valid`;
@@ -47,8 +55,7 @@ export async function sendBeaconEvent(
   const v: number = body.value;
   const s: number = body.duration || 5;
   const ext: number[] = body.ext || [0, 0, 0];
-  const ab = new ArrayBuffer(11);
-  const u8a = new Uint8Array(ab);
+  const u8a = Buffer.alloc(11);
   u8a[0] = parseInt(mac.slice(0, 2), 16) || 0;
   u8a[1] = parseInt(mac.slice(2, 4), 16) || 0;
   u8a[2] = parseInt(mac.slice(4, 6), 16) || 0;
@@ -66,7 +73,7 @@ export async function sendBeaconEvent(
 
   const durationMs = s * 1000;
   await utils.udp
-    .sendBinaryCmd(cmd, gMac, [gateway.ip], ab)
+    .sendBinaryCmd(gMac, cmd, u8a)
     .pipe(
       timeout(body.timeout || durationMs),
       catchError(err => {

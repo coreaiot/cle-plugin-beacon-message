@@ -1,4 +1,4 @@
-import { IBinaryCommand, Plugin, Utils, addColonToMac, getBeacons } from "./lib";
+import { IGatewayResult, Plugin, Utils, getBeacons } from "@lib";
 import { sendMessageM0 } from "./sendMessageM0";
 import { IGroupedLocator, sendMessageM12, groupLocators } from "./sendMessageM12";
 
@@ -8,6 +8,7 @@ export interface IMessageBody {
   timeoutM0?: number; // M0 信标超时时间（秒）（留空时使用全局超时时间）
   timeoutM12?: number; // M1，M2 信标超时时间（秒）（留空时使用全局超时时间）
   sendDurationM0?: number; // M0 信标发送时间（秒）（留空时为 5 秒）
+  beaconResponseDurationM12?: number; // M1, M2 信标回复时间（秒）（留空时为 3 秒）
   locator?: string; // 指定基站发送。（IP 或 MAC）（留空时使用最近信号最好的基站）
   bufferSize?: number;// 分包长度（字节）（不大于 200）（留空时为 200）
   value: number[]; // 消息内容
@@ -33,7 +34,8 @@ export async function sendMessage(
   const m12: string[] = [];
   let sendDurationM0 = 5;
   let timeoutM0 = 10;
-  let timeoutM12 = 3;
+  let timeoutM12 = 5;
+  let beaconResponseDurationM12 = 3;
   let value: number[] = [];
   let bufferSize = 200;
 
@@ -47,6 +49,9 @@ export async function sendMessage(
 
   if (obj.timeoutM12 && typeof obj.timeoutM12 === 'number')
     timeoutM12 = obj.timeoutM12;
+
+  if (obj.beaconResponseDurationM12 && typeof obj.beaconResponseDurationM12 === 'number')
+    beaconResponseDurationM12 = obj.beaconResponseDurationM12;
 
   if (obj.sendDurationM0 && typeof obj.sendDurationM0 === 'number')
     sendDurationM0 = obj.sendDurationM0;
@@ -67,10 +72,19 @@ export async function sendMessage(
 
   const beacons = getBeacons(utils);
   const locators = (() => {
+    const locators: IGatewayResult[] = [];
     const now = new Date().getTime();
     const ts = now - utils.projectEnv.locatorLifeTime;
-    const data = utils.packGatewaysByMac(utils.activeLocators, ts);
-    return data;
+    const buf = utils.ca.getLocatorsBuffer(ts);
+    if (buf.length > 5) {
+      const bsize = buf.readUint16LE(3);
+      const n = (buf.length - 5) / bsize;
+      for (let i = 0; i < n; ++i) {
+        const l = utils.parseLocatorResult(buf, i * bsize + 5, ts);
+        locators.push(l);
+      }
+    }
+    return utils.packGatewaysByMac(locators, undefined, true);
   })();
 
   let done: string[] = [];
@@ -104,7 +118,7 @@ export async function sendMessage(
             return locator;
           } else {
             const mac = obj.locator.replace(/:/g, '').toLowerCase();
-            const locator = locators[addColonToMac(mac)];
+            const locator = locators[mac];
             if (!locator) {
               throw 'locator `' + obj.locator + '` not found.';
             }
@@ -115,17 +129,18 @@ export async function sendMessage(
           }
         }
         let locatorMac = beacons[mac].nearestGateway;
-        let locator = locators[addColonToMac(locatorMac)];
+        let locator = locators[locatorMac];
         if (!locator || !locator.ip) {
           locatorMac = beacons[mac].lastGateway;
-          locator = locators[addColonToMac(locatorMac)];
+          locator = locators[locatorMac];
         }
         if (!locator || !locator.ip) {
+          console.log(locator)
           throw 'locator `' + locatorMac + '` offline.';
         }
         return [locatorMac, locator];
       })();
-      resM0 = await sendMessageM0Item(self, utils, mac, locatorMac, [locator.ip], obj.value, sendDurationM0, timeoutM0, 2000);
+      resM0 = await sendMessageM0Item(self, utils, mac, locatorMac, obj.value, sendDurationM0, timeoutM0, 2000);
       m0ts = new Date().getTime();
     }
 
@@ -150,14 +165,13 @@ export async function sendMessage(
             }
             const res: IGroupedLocator = {
               mac: locator[0],
-              ip,
               product: '',
               sMacs: m12,
             }
             return [res];
           } else {
             const mac = obj.locator.replace(/:/g, '').toLowerCase();
-            const locator = locators[addColonToMac(mac)];
+            const locator = locators[mac];
             if (!locator) {
               throw 'locator `' + obj.locator + '` not found.';
             }
@@ -166,7 +180,6 @@ export async function sendMessage(
             }
             const res: IGroupedLocator = {
               mac,
-              ip: locator.ip,
               product: '',
               sMacs: m12,
             }
@@ -178,7 +191,7 @@ export async function sendMessage(
       })();
       console.log('gls', gls);
       const results = await Promise.all(
-        gls.map(gl => sendMessageM12Item(self, utils, gl, value, bufferSize, timeoutM12, 2000))
+        gls.map(gl => sendMessageM12Item(self, utils, gl, value, bufferSize, timeoutM12, beaconResponseDurationM12, 2000))
       );
       resM12 = results.flat();
     }
@@ -188,7 +201,7 @@ export async function sendMessage(
     if (sendDurationM0 >= timeoutM0)
       throw 'property `sendDurationM0` has to be less than property `timeoutM0`';
 
-    done = await sendMessageM0Item(self, utils, undefined, undefined, undefined, obj.value, sendDurationM0, timeoutM0, 2000);
+    done = await sendMessageM0Item(self, utils, undefined, undefined, obj.value, sendDurationM0, timeoutM0, 2000);
   }
   self.status.status = 'idle';
   utils.updateStatus(self);
@@ -203,6 +216,7 @@ async function sendMessageM12Item(
   value: number[],
   bufferSizeM12: number,
   timeoutM12: number,
+  beaconResponseDurationM12: number,
   locatorResponseTimeoutMs: number,
 ) {
   if (self.debug) {
@@ -215,7 +229,7 @@ async function sendMessageM12Item(
   for (let idx = 0; idx < numberOfPackets; ++idx) {
     const data = value.slice(idx * bufferSizeM12, (idx + 1) * bufferSizeM12);
 
-    const timeoutMS = timeoutM12 * 1000;
+    const timeoutMS = beaconResponseDurationM12 * 1000;
     const v = idx
       ? [
         beaconRequestId,
@@ -269,7 +283,7 @@ async function sendMessageM12Item(
         if (ok.size === done.length) return;
         r(ok);
         utils.ee.off('beacon-response', cb);
-      }, timeoutMS);
+      }, timeoutM12 * 1000);
     });
     const arr = Array.from(res);
     if (self.debug) {
@@ -286,7 +300,6 @@ async function sendMessageM0Item(
   utils: Utils,
   mac: string,
   locatorMac: string,
-  locatorAddrs: string[],
   value: string | number[],
   sendDurationM0: number,
   timeoutM0: number,
@@ -301,7 +314,6 @@ async function sendMessageM0Item(
     utils,
     mac || '010203040506',
     locatorMac,
-    locatorAddrs,
     value,
     sendDurationM0,
     locatorResponseTimeoutMs,

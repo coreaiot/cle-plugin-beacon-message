@@ -3,7 +3,7 @@ export * from './status';
 export * from './i18n';
 
 import { Context } from 'koa';
-import { Plugin, Utils, generateDocs, parseHttpRequestBody } from './lib';
+import { Plugin, Utils, generateDocs, parseHttpRequestBody } from '@lib';
 import { IBeaconEventBody, sendBeaconEvent } from './sendBeaconEvent';
 import { IMessageBody, sendMessage } from './sendMessage';
 import { IMessageBatchBody, sendMessageBatch } from './sendMessageBatch';

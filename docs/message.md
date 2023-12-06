@@ -20,10 +20,11 @@
 ```ts
 export interface IMessageBody {
   macs?: string[]; // 信标 MAC（留空为广播至所有 M0 信标）
-  timeout?: number; // 全局超时时间（秒）（留空时 M0 信标为 10 秒，M1，M2 信标为 3 秒）
+  timeout?: number; // 全局超时时间（秒）（留空时 M0 信标为 10 秒，M1，M2 信标为 5 秒）
   timeoutM0?: number; // M0 信标超时时间（秒）（留空时使用全局超时时间）
   timeoutM12?: number; // M1，M2 信标超时时间（秒）（留空时使用全局超时时间）
   sendDurationM0?: number; // M0 信标发送时间（秒）（留空时为 5 秒）
+  beaconResponseDurationM12?: number; // M1, M2 信标回复时间（秒）（留空时为 3 秒）
   locator?: string; // 指定基站发送。（IP 或 MAC）（留空时使用最近信号最好的基站）
   bufferSize?: number;// M1, M2 分包长度（字节）（不大于 200）（留空时为 200）
   value: number[]; // 消息内容
@@ -62,10 +63,11 @@ export interface IMessageResult {
 ```ts
 export interface IMessageBody {
   macs?: string[]; // Beacon MACs - If not set, it sends message to all M0 beacons.
-  timeout?: number; // Global timeout (second) - If not set, 10s for M0 beacons, and 3s for M1. M2 beacons.
+  timeout?: number; // Global timeout (second) - If not set, 10s for M0 beacons, and 5s for M1. M2 beacons.
   timeoutM0?: number; // Timeout for M0 beacons (second) - If not set, it uses the global timeout.
-  timeoutM12?: number; // Timeout for M1，M2 beacons (second) - If not set, it uses the global timeout.
+  timeoutM12?: number; // Timeout for M1, M2 beacons (second) - If not set, it uses the global timeout.
   sendDurationM0?: number; // Duration for locators sending M0 beacons (second) - 5s if not set
+  beaconResponseDurationM12?: number; // Duration for beacon response for M1, M2 beacons (second) - 3s if not set
   locator?: string; // The locator to send message (IP or MAC) - If not set, it uses the nearest locator.
   bufferSize?: number;// Packeage buffer size for M1, M2 beacons (bytes) - It must not be greater than 200. If not set, it uses 200.
   value: number[]; // Message content

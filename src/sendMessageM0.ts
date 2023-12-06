@@ -1,5 +1,5 @@
 import { checkSum1B } from "./checkSum1B";
-import { IBinaryCommand, Utils } from "./lib";
+import { IBinaryCommand, Utils } from "@lib";
 
 const cmdMsgLong: IBinaryCommand = {
   cmd: 0x17,
@@ -15,7 +15,6 @@ export async function sendMessageM0(
   utils: Utils,
   mac: string,
   locatorMac: string,
-  locatorAddrs: string[],
   value: string | number[],
   sendDurationM0: number,
   locatorResponseTimeoutMs: number,
@@ -24,8 +23,7 @@ export async function sendMessageM0(
 
   if (v.length > 63) throw 'The max length of value is 63';
 
-  const ab = new ArrayBuffer(7 + v.length);
-  const u8a = new Uint8Array(ab);
+  const u8a = Buffer.alloc(7 + v.length);
   u8a[0] = sendDurationM0;
   u8a[1] = parseInt(mac.slice(0, 2), 16) || 0;
   u8a[2] = parseInt(mac.slice(2, 4), 16) || 0;
@@ -39,7 +37,7 @@ export async function sendMessageM0(
   const { take, timeout, catchError } = utils.modules.rxjsOperators;
   const { throwError, TimeoutError } = utils.modules.rxjs;
   await utils.udp
-    .sendBinaryCmd(cmdMsgLong, locatorMac, locatorAddrs, ab)
+    .sendBinaryCmd(locatorMac, cmdMsgLong, u8a)
     .pipe(
       timeout(locatorResponseTimeoutMs),
       catchError(err => {
