@@ -1,6 +1,6 @@
 import { IGatewayResult, Plugin, Utils, getBeacons } from "@lib";
 import { sendMessageM0 } from "./sendMessageM0";
-import { IGroupedLocator, sendMessageM12, groupLocators } from "./sendMessageM12";
+import { IGroupedLocator, sendMessageM12, groupLocators, stopSendMessageM12 } from "./sendMessageM12";
 
 export interface IMessageBody {
   macs?: string[]; // 信标 MAC（留空为广播至所有 M0 信标）
@@ -259,7 +259,7 @@ async function sendMessageM12Item(
     if (self.debug) {
       self.logger.debug(`[sendMessage ${done.join()}] sending m12 message ${step}`);
     }
-    await sendMessageM12(utils, v, timeoutM12, locatorResponseTimeoutMs, 'start', gl);
+    await sendMessageM12(utils, v, timeoutM12, locatorResponseTimeoutMs, gl);
     if (self.debug) {
       self.logger.debug(`[sendMessage ${done.join()}] waiting for response ${step}`);
     }
@@ -292,6 +292,7 @@ async function sendMessageM12Item(
     done = done.filter(x => arr.includes(x));
   }
 
+  await stopSendMessageM12(utils, gl.mac);
   return done;
 }
 

@@ -31,7 +31,6 @@ export async function sendMessageM12(
   value: number[],
   timeoutMs: number,
   locatorResponseTimeoutMs: number,
-  type: 'start' | 'stop' = 'start',
   groupedLocator: IGroupedLocator
 ) {
   const l = groupedLocator;
@@ -39,39 +38,39 @@ export async function sendMessageM12(
   const { take, timeout, catchError } = utils.modules.rxjsOperators;
   const { throwError, TimeoutError } = utils.modules.rxjs;
 
-  if (type === 'start') {
-    const length = 18 + value.length + 6 * l.sMacs.length;
-    const u8a = Buffer.alloc(length);
-    u8a[0] = 2;
-    u8a[1] = timeoutMs;
-    u8a[2] = 0x80;
-    u8a[16] = value.length;
-    for (let i = 0; i < value.length; ++i) {
-      u8a[17 + i] = value[i];
-    }
-    u8a[17 + value.length] = l.sMacs.length;
-    for (let i = 0; i < l.sMacs.length; ++i) {
-      const idx = 18 + value.length + i * 6;
-      for (let j = 0; j < 6; ++j)
-        u8a[idx + j] = parseInt(l.sMacs[i].slice(j * 2, j * 2 + 2), 16);
-    }
-    await utils.udp
-      .sendBinaryCmd(l.mac, cmdSendMessage, u8a)
-      .pipe(
-        timeout(locatorResponseTimeoutMs),
-        catchError(err => {
-          if (err instanceof TimeoutError) {
-            throw 'Locator response timeout.';
-          }
-          return throwError(err);
-        }),
-        take(1),
-      )
-      .toPromise();
-  } else {
-    utils.udp
-      .sendBinaryCmd(l.mac, cmdStopSendMessage);
+  const length = 18 + value.length + 6 * l.sMacs.length;
+  const u8a = Buffer.alloc(length);
+  u8a[0] = 2;
+  u8a[1] = timeoutMs;
+  u8a[2] = 0x80;
+  u8a[16] = value.length;
+  for (let i = 0; i < value.length; ++i) {
+    u8a[17 + i] = value[i];
   }
+  u8a[17 + value.length] = l.sMacs.length;
+  for (let i = 0; i < l.sMacs.length; ++i) {
+    const idx = 18 + value.length + i * 6;
+    for (let j = 0; j < 6; ++j)
+      u8a[idx + j] = parseInt(l.sMacs[i].slice(j * 2, j * 2 + 2), 16);
+  }
+  await utils.udp
+    .sendBinaryCmd(l.mac, cmdSendMessage, u8a)
+    .pipe(
+      timeout(locatorResponseTimeoutMs),
+      catchError(err => {
+        if (err instanceof TimeoutError) {
+          throw 'Locator response timeout.';
+        }
+        return throwError(err);
+      }),
+      take(1),
+    )
+    .toPromise();
+}
+
+export function stopSendMessageM12(utils: Utils, locatorMac: string) {
+  return utils.udp
+    .sendBinaryCmd(locatorMac, cmdStopSendMessage);
 }
 
 export function groupLocators(beacons: IBeacons, locators: IGateways, macs: string[]) {

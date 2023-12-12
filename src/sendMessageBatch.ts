@@ -1,6 +1,6 @@
 import { IGatewayResult, Plugin, Utils, getBeacons } from "@lib";
 import { sendMessageM0 } from "./sendMessageM0";
-import { IGroupedLocator, sendMessageM12 } from "./sendMessageM12";
+import { IGroupedLocator, sendMessageM12, stopSendMessageM12 } from "./sendMessageM12";
 
 export interface IMessageBatchBody {
   timeout?: number; // 全局超时时间（秒）（留空时 M0 信标为 10 秒，M1，M2 信标为 3 秒）
@@ -219,7 +219,7 @@ async function sendMessageM12BatchItem(
 
     const step = (idx + 1) + '/' + numberOfPackets;
     addLog(self, utils, logs, mac, 'DEBUG', 'sending m12 message ' + step);
-    await sendMessageM12(utils, v, timeoutM12, locatorResponseTimeoutMs, 'start', gl);
+    await sendMessageM12(utils, v, timeoutM12, locatorResponseTimeoutMs, gl);
     addLog(self, utils, logs, mac, 'DEBUG', 'waiting for response ' + step);
     await new Promise<void>(async (r, rr) => {
       let ok = false;
@@ -242,6 +242,7 @@ async function sendMessageM12BatchItem(
     });
   }
 
+  stopSendMessageM12(utils, locatorMac);
   addLog(self, utils, logs, mac, 'DEBUG', 'done');
 }
 
