@@ -33,9 +33,7 @@ export interface IMessageBody {
 
 ## JSON Result 结构
 ```ts
-export interface IMessageResult {
-  beacons: string[]; // 发关成功的信标 MAC
-}
+export type IMessageResult = string[]; // 发送成功的信标 MAC
 ```
 
 ## 示例
@@ -76,9 +74,7 @@ export interface IMessageBody {
 
 ## JSON Result structure
 ```ts
-export interface IMessageResult {
-  beacons: string[]; // Beacons successfully received the message.
-}
+export type IMessageResult = string[] // Beacons successfully received the message.
 ```
 
 ## Example
@@ -93,7 +89,5 @@ export interface IMessageResult {
 
 > 200
 ```json
-{
-  "beacons": ["3cfad3b09998", "3cfad3b09999"]
-}
+["3cfad3b09998", "3cfad3b09999"]
 ```

@@ -205,7 +205,7 @@ export async function sendMessage(
   }
   self.status.status = 'idle';
   utils.updateStatus(self);
-  return { beacons: done };
+  return done;
 }
 
 
