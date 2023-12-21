@@ -25,7 +25,6 @@ export async function sendBeaconEvent(
   body: IBeaconEventBody
 ) {
   self.status.status = 'sending beacon event';
-  utils.updateStatus(self);
 
   if (!body.mac) throw 'Beacon mac required';
   const mac: string = body.mac.toLowerCase().replace(/:/g, '');
@@ -88,6 +87,5 @@ export async function sendBeaconEvent(
 
   setTimeout(() => {
     self.status.status = 'idle';
-    utils.updateStatus(self);
   }, durationMs);
 }

@@ -28,7 +28,6 @@ export async function sendMessage(
   obj: IMessageBody,
 ) {
   self.status.status = 'sending message';
-  utils.updateStatus(self);
 
   const m0: string[] = [];
   const m12: string[] = [];
@@ -204,7 +203,6 @@ export async function sendMessage(
     done = await sendMessageM0Item(self, utils, undefined, undefined, obj.value, sendDurationM0, timeoutM0, 2000);
   }
   self.status.status = 'idle';
-  utils.updateStatus(self);
   return done;
 }
 

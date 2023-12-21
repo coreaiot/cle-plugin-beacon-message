@@ -22,7 +22,6 @@ export async function sendMessageBatch(
   obj: IMessageBatchBody,
 ) {
   self.status.status = 'batch sending message';
-  utils.updateStatus(self);
 
   let sendDurationM0 = 5;
   let timeoutM0 = 10;
@@ -139,7 +138,6 @@ export async function sendMessageBatch(
   await Promise.all(ps);
 
   self.status.status = 'idle';
-  utils.updateStatus(self);
   return {
     logs,
     results: items.map(x => ({

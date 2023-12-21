@@ -15,9 +15,6 @@ export async function init(self: Plugin, utils: Utils) {
     return config.apiPrefix + p;
   };
   self.status.status = 'idle';
-  setInterval(() => {
-    utils.updateStatus(self);
-  }, 1000);
 
   const errMsgBuzy = 'Busy now. Try later!';
 

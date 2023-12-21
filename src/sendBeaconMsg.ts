@@ -15,7 +15,6 @@ export async function sendBeaconMsg(
   long: boolean,
 ) {
   self.status.status = long ?  'sending beacon msgLong' : 'sending beacon msg';
-  utils.updateStatus(self);
 
   let mac: string;
   let gMac: string;
@@ -69,7 +68,6 @@ export async function sendBeaconMsg(
   const done: string[] = await sendMessageItem(self, utils, mac, gMac, obj.value, sendDurationM0, timeoutM0, 2000, long);
 
   self.status.status = 'idle';
-  utils.updateStatus(self);
   return { beacons: done };
 }
 
