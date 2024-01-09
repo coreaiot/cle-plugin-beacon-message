@@ -1,5 +1,5 @@
 import { checkSum1B } from "./checkSum1B";
-import { IBinaryCommand, Utils } from "@lib";
+import { IBinaryCommand, Utils, IGatewayResult } from "@lib";
 
 const cmdMsgLong: IBinaryCommand = {
   cmd: 0x17,
@@ -36,17 +36,53 @@ export async function sendMessageM0(
 
   const { take, timeout, catchError } = utils.modules.rxjsOperators;
   const { throwError, TimeoutError } = utils.modules.rxjs;
-  await utils.udp
-    .sendBinaryCmd(locatorMac, cmdMsgLong, u8a)
-    .pipe(
-      timeout(locatorResponseTimeoutMs),
-      catchError(err => {
-        if (err instanceof TimeoutError) {
-          throw 'locator response timeout.';
+
+  if (locatorMac) {
+    await utils.udp
+      .sendBinaryCmd(locatorMac, cmdMsgLong, u8a)
+      .pipe(
+        timeout(locatorResponseTimeoutMs),
+        catchError(err => {
+          if (err instanceof TimeoutError) {
+            throw 'locator response timeout.';
+          }
+          return throwError(err);
+        }),
+        take(1),
+      )
+      .toPromise();
+  } else {
+    const locators = (() => {
+      const locators: IGatewayResult[] = [];
+      const now = new Date().getTime();
+      const ts = now - utils.projectEnv.locatorLifeTime;
+      const buf = utils.ca.getLocatorsBuffer(ts);
+      if (buf.length > 5) {
+        const bsize = buf.readUint16LE(3);
+        const n = (buf.length - 5) / bsize;
+        for (let i = 0; i < n; ++i) {
+          const l = utils.parseLocatorResult(buf, i * bsize + 5, ts);
+          locators.push(l);
         }
-        return throwError(err);
-      }),
-      take(1),
-    )
-    .toPromise();
+      }
+      return locators;
+    })();
+
+    try {
+      await Promise.all(locators.map(l => utils.udp
+        .sendBinaryCmd(l.mac, cmdMsgLong, u8a)
+        .pipe(
+          timeout(locatorResponseTimeoutMs),
+          catchError(err => {
+            if (err instanceof TimeoutError) {
+              throw 'locator response timeout.';
+            }
+            return throwError(err);
+          }),
+          take(1),
+        )
+        .toPromise()
+      ));
+    } catch { }
+  }
 }

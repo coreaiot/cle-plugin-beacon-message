@@ -1,5 +1,5 @@
 import { checkSum1B } from "./checkSum1B";
-import { IBinaryCommand, Utils } from "@lib";
+import { IBinaryCommand, Utils, IGatewayResult } from "@lib";
 
 const cmdMsg: IBinaryCommand = {
   cmd: 0x16,
@@ -21,7 +21,7 @@ export async function sendMessageM0Old(
 ) {
   const v = typeof value === 'string' ? Array.from(Buffer.from(value)) : value;
 
-  if (v.length > 63) throw 'The max length of value is 63';
+  if (v.length > 21) throw 'The max length of value is 21';
 
   const u8a = Buffer.alloc(28);
   u8a[0] = sendDurationM0;
@@ -36,17 +36,53 @@ export async function sendMessageM0Old(
 
   const { take, timeout, catchError } = utils.modules.rxjsOperators;
   const { throwError, TimeoutError } = utils.modules.rxjs;
-  await utils.udp
-    .sendBinaryCmd(locatorMac, cmdMsg, u8a)
-    .pipe(
-      timeout(locatorResponseTimeoutMs),
-      catchError(err => {
-        if (err instanceof TimeoutError) {
-          throw 'locator response timeout.';
+
+  if (locatorMac) {
+    await utils.udp
+      .sendBinaryCmd(locatorMac, cmdMsg, u8a)
+      .pipe(
+        timeout(locatorResponseTimeoutMs),
+        catchError(err => {
+          if (err instanceof TimeoutError) {
+            throw 'locator response timeout.';
+          }
+          return throwError(err);
+        }),
+        take(1),
+      )
+      .toPromise();
+  } else {
+    const locators = (() => {
+      const locators: IGatewayResult[] = [];
+      const now = new Date().getTime();
+      const ts = now - utils.projectEnv.locatorLifeTime;
+      const buf = utils.ca.getLocatorsBuffer(ts);
+      if (buf.length > 5) {
+        const bsize = buf.readUint16LE(3);
+        const n = (buf.length - 5) / bsize;
+        for (let i = 0; i < n; ++i) {
+          const l = utils.parseLocatorResult(buf, i * bsize + 5, ts);
+          locators.push(l);
         }
-        return throwError(err);
-      }),
-      take(1),
-    )
-    .toPromise();
+      }
+      return locators;
+    })();
+
+    try {
+      await Promise.all(locators.map(l => utils.udp
+        .sendBinaryCmd(l.mac, cmdMsg, u8a)
+        .pipe(
+          timeout(locatorResponseTimeoutMs),
+          catchError(err => {
+            if (err instanceof TimeoutError) {
+              throw 'locator response timeout.';
+            }
+            return throwError(err);
+          }),
+          take(1),
+        )
+        .toPromise()
+      ));
+    } catch { }
+  }
 }

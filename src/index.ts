@@ -100,7 +100,6 @@ export async function init(self: Plugin, utils: Utils) {
 
         try {
           const requestBody = parseHttpRequestBody<IMsgBody>(ctx);
-          requestBody.mac = ctx.params.mac;
           const res = await sendBeaconMsg(self, utils, requestBody, false);
           ctx.status = 200;
           ctx.body = res;
@@ -122,7 +121,6 @@ export async function init(self: Plugin, utils: Utils) {
 
         try {
           const requestBody = parseHttpRequestBody<IMsgBody>(ctx);
-          requestBody.mac = ctx.params.mac;
           const res = await sendBeaconMsg(self, utils, requestBody, true);
           ctx.status = 200;
           ctx.body = res;
