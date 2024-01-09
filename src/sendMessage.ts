@@ -195,12 +195,14 @@ export async function sendMessage(
       resM12 = results.flat();
     }
 
-    done = [...resM0, ...resM12];
+    done = [...resM0, ...resM12]
+      .filter(mac => obj.macs.includes(mac));;
   } else {
     if (sendDurationM0 >= timeoutM0)
       throw 'property `sendDurationM0` has to be less than property `timeoutM0`';
 
     done = await sendMessageM0Item(self, utils, undefined, undefined, obj.value, sendDurationM0, timeoutM0, 2000);
+    done = done.filter(mac => beacons[mac] && beacons[mac].userData[0] && !beacons[mac].userData[0].method);
   }
   self.status.status = 'idle';
   return done;
