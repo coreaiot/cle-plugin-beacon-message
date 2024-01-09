@@ -1,5 +1,5 @@
 import { checkSum1B } from './checkSum1B';
-import { getBeacons, IBinaryCommand, IGatewayResult, Plugin, Utils, addColonToMac } from '@lib';
+import { IBinaryCommand, Plugin, Utils } from '@lib';
 
 const cmd: IBinaryCommand = {
   cmd: 0x13,
@@ -29,27 +29,29 @@ export async function sendBeaconEvent(
   if (!body.mac) throw 'Beacon mac required';
   const mac: string = body.mac.toLowerCase().replace(/:/g, '');
 
-  const beacons = getBeacons(utils);
-  if (!beacons[mac]) throw `Beacon ${mac} not valid`;
-
-  const gMac = beacons[mac].lastGateway;
-  const gateways = (() => {
-    const locators: IGatewayResult[] = [];
+  const gMac = (() => {
     const now = new Date().getTime();
     const ts = now - utils.projectEnv.locatorLifeTime;
-    const buf = utils.ca.getLocatorsBuffer(ts);
+    const buf = utils.ca.getBeaconBuffer(mac, ts);
     if (buf.length > 5) {
-      const bsize = buf.readUint16LE(3);
-      const n = (buf.length - 5) / bsize;
-      for (let i = 0; i < n; ++i) {
-        const l = utils.parseLocatorResult(buf, i * bsize + 5, ts);
-        locators.push(l);
-      }
+      const b = utils.parseBeaconResult(buf, 5);
+      return b.lastGateway;
+    } else {
+      throw `Beacon ${mac} not valid`;
     }
-    return utils.packGatewaysByMac(locators, undefined, true);
   })();
-  const gateway = gateways[addColonToMac(gMac)];
-  if (!gateway) throw `Locator ${gMac} not valid`;
+
+  const locator = (() => {
+    const now = new Date().getTime();
+    const ts = now - utils.projectEnv.locatorLifeTime;
+    const buf = utils.ca.getLocatorBuffer(gMac, ts);
+    if (buf.length > 5) {
+      const l = utils.parseLocatorResult(buf, 5, ts);
+      return l;
+    } else {
+      throw `Locator ${gMac} not valid`;
+    }
+  })();
 
   const v: number = body.value;
   const s: number = body.duration || 5;
